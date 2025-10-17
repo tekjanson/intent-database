@@ -70,7 +70,11 @@ impl IntentDatabase {
             .filter(|(_, score)| score.is_match(self.matcher.match_threshold))
             .collect();
 
-        matches.sort_by(|a, b| b.1.score.partial_cmp(&a.1.score).unwrap());
+        matches.sort_by(|a, b| {
+            b.1.score
+                .partial_cmp(&a.1.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         matches
     }
 

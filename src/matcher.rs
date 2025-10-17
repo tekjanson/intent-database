@@ -30,13 +30,17 @@ impl ConversationMatcher {
     pub fn new(match_threshold: f64) -> Self {
         Self { match_threshold }
     }
+}
 
-    pub fn default() -> Self {
+impl Default for ConversationMatcher {
+    fn default() -> Self {
         Self {
             match_threshold: 0.6,
         }
     }
+}
 
+impl ConversationMatcher {
     /// Calculate similarity between two intents
     pub fn calculate_intent_similarity(&self, intent1: &Intent, intent2: &Intent) -> f64 {
         let mut similarity = 0.0;
@@ -105,16 +109,22 @@ impl ConversationMatcher {
             .collect();
 
         // Sort by score descending
-        matches.sort_by(|a, b| b.1.score.partial_cmp(&a.1.score).unwrap());
+        matches.sort_by(|a, b| {
+            b.1.score
+                .partial_cmp(&a.1.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         matches
     }
 
     /// Simple text similarity using word overlap
     fn calculate_text_similarity(&self, text1: &str, text2: &str) -> f64 {
+        use std::collections::HashSet;
+
         let text1_lower = text1.to_lowercase();
         let text2_lower = text2.to_lowercase();
         let words1: Vec<&str> = text1_lower.split_whitespace().collect();
-        let words2: Vec<&str> = text2_lower.split_whitespace().collect();
+        let words2: HashSet<&str> = text2_lower.split_whitespace().collect();
 
         if words1.is_empty() || words2.is_empty() {
             return 0.0;
@@ -133,6 +143,8 @@ impl ConversationMatcher {
 
     /// Calculate similarity between two string vectors
     fn calculate_vec_similarity(&self, vec1: &[String], vec2: &[String]) -> f64 {
+        use std::collections::HashSet;
+
         if vec1.is_empty() && vec2.is_empty() {
             return 1.0;
         }
@@ -140,9 +152,10 @@ impl ConversationMatcher {
             return 0.0;
         }
 
+        let vec2_set: HashSet<&String> = vec2.iter().collect();
         let mut common_count = 0;
         for item1 in vec1 {
-            if vec2.contains(item1) {
+            if vec2_set.contains(item1) {
                 common_count += 1;
             }
         }
