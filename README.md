@@ -42,109 +42,114 @@ let intent = Intent::new("Get weather forecast".to_string())
     .with_context_tags(vec!["casual".to_string()]);
 
 let mut conv = Conversation::new(
-    "conv-001".to_string(),
-    intent,
-    Sentiment::Neutral,
-);
+    # Intent Database
 
-// Add conversation entries
-conv.add_entry(ConversationEntry::new(
-    "user".to_string(),
-    "What's the weather like?".to_string(),
-));
+    An experimental Rust library and in-memory store for caching, matching, and replaying "intentful" conversations.
 
-// Store in database
-db.store(conv).unwrap();
+    This project is intentionally small and focused: instead of storing raw text blobs and re-querying an LLM for every request, the intent-database stores conversations annotated by purpose (intent), topics, context tags, sentiment and message history — then matches new queries to past conversations by intent and structure. The goal is to allow programmatic replay, templating and light-weight simulation of AI behaviour for common flows.
 
-// Query for similar conversations
-let query_intent = Intent::new("Check weather".to_string())
-    .with_topics(vec!["weather".to_string()]);
-let query = Conversation::new("query".to_string(), query_intent, Sentiment::Neutral);
+    ## What this repo provides
 
-// Find matches
-let matches = db.find_similar(&query);
-for (conv_id, score) in matches {
-    println!("Match: {} (score: {:.2})", conv_id, score.score);
-}
-```
+    - A lightweight in-memory IntentDatabase suitable for caching conversation patterns
+    - A matching layer that compares Intent objects (purpose, topics, tags) and conversation metadata to compute a similarity score
+    - Expiry/invalidation support so cached facts can be time-limited
+    - Example usage showing how to store and query conversation templates
 
-## Architecture
+    ## Design contract (short)
 
-### Core Components
+    - Inputs: Conversation records (id, Intent, sentiment, entries, optional expiry, metadata)
+    - Outputs: Match results: (conversation id, similarity score 0.0–1.0) and access to stored Conversation data
+    - Error modes: store/find operations return Result types; expired entries are treated as non-matches
+    - Success: a match score above a configurable threshold indicates a likely reusable conversation/template
 
-1. **Conversation**: Represents a complete conversation with intent, sentiment, and message history
-2. **Intent**: Captures the purpose, topics, and contextual tags of a conversation
-3. **IntentDatabase**: Main storage system with matching and retrieval capabilities
-4. **ConversationMatcher**: Implements similarity scoring algorithms
+    Edge cases handled: missing topics, empty entries, expired records, and configurable similarity thresholds.
 
-### Data Structures
+    ## Why this approach
 
-- **Intent**: Purpose-driven conversation metadata
-  - `purpose`: Primary goal or purpose
-  - `topics`: Key topics discussed
-  - `context_tags`: Contextual categorization
+    Many practical AI interactions are repetitive and templatable. By focusing on the developer-visible intent and replaying prior agent behaviour with data substitution, you can reduce external LLM calls, provide deterministic behaviour for common flows, and prototype "fake" AI agents that are fast, free, and auditable.
 
-- **Conversation**: Complete conversation record
-  - `id`: Unique identifier
-  - `intent`: The conversation's intent
-  - `sentiment`: Emotional tone
-  - `entries`: Message history
-  - `expires_at`: Optional expiry for fact invalidation
-  - `metadata`: Flexible key-value storage
+    This is not a replacement for full NLP/embedding systems. Instead it's a pragmatic cache + matching layer that sits in front of or alongside LLMs.
 
-### Matching Algorithm
+    ## Quick start
 
-The matcher uses a weighted similarity calculation:
-- **Purpose similarity** (50% weight): Text-based word overlap
-- **Topic similarity** (30% weight): Common topics between conversations
-- **Context similarity** (20% weight): Matching context tags
-- **Sentiment bonus** (10%): Additional boost for matching sentiment
+    Prerequisites: Rust toolchain (stable) and Cargo.
 
-## Building and Testing
+    To build the project and run the demo:
 
-```bash
-# Build the project
-cargo build
+    ```bash
+    cargo build
+    cargo run --example basic_usage
+    ```
 
-# Run all tests
-cargo test
+    Persistence
 
-# Run with verbose output
-cargo test -- --nocapture
+    This crate now supports simple file-backed persistence using JSON. The
+    database can be saved to and loaded from disk with `save_to_file` and
+    `load_from_file` (or `load_or_new` to load if present or create a new DB).
 
-# Build for release
-cargo build --release
-```
+    Example:
 
-## Use Cases
+    ```rust
+    let db_path = "intent_db.json";
+    let mut db = IntentDatabase::load_or_new(db_path, 0.6)?;
+    // ... store/update conversations ...
+    db.save_to_file(db_path)?;
+    ```
 
-1. **AI Response Caching**: Cache frequently asked questions to reduce API calls
-2. **Conversation Templates**: Store and reuse conversation patterns
-3. **Intent Recognition**: Match user queries to known conversation patterns
-4. **Semantic Search**: Find conversations by meaning, not just keywords
-5. **Thought Databases**: Store conceptual knowledge with expiry patterns
+    To use the library from your code (example):
 
-## Why Rust?
+    ```rust
+    use intent_database::{Conversation, ConversationEntry, Intent, IntentDatabase, Sentiment};
 
-This project is built in Rust because:
-- **Performance**: Fast in-memory operations for real-time matching
-- **Safety**: Strong type system prevents common bugs
-- **Cool Factor**: Rust is indeed cool! 🦀
+    // Create DB with a threshold for what you consider a good match (0.0 - 1.0)
+    let mut db = IntentDatabase::with_threshold(0.6);
 
-## Future Enhancements
+    // Build an intent describing the user's purpose and important topics
+    let intent = Intent::new("Get weather forecast".to_string())
+        .with_topics(vec!["weather".to_string(), "temperature".to_string()])
+        .with_context_tags(vec!["casual".to_string()]);
 
-Potential areas for expansion:
-- Persistence layer (disk storage, database integration)
-- Advanced NLP-based similarity (embeddings, transformers)
-- Distributed caching support
-- Query optimization and indexing
-- REST API or gRPC interface
-- Streaming conversation updates
+    let mut conv = Conversation::new("conv-001".to_string(), intent, Sentiment::Neutral);
+    conv.add_entry(ConversationEntry::new("user".to_string(), "What's the weather like?".to_string()));
 
-## License
+    // Store and later query
+    db.store(conv)?;
 
-This project is open source and available for experimentation and learning.
+    let q_intent = Intent::new("Check weather".to_string()).with_topics(vec!["weather".to_string()]);
+    let query = Conversation::new("q".to_string(), q_intent, Sentiment::Neutral);
 
-## Contributing
+    let matches = db.find_similar(&query);
+    for m in matches {
+        println!("Matched: {} (score: {:.2})", m.id, m.score);
+    }
+    ```
 
-This is an experimental project exploring novel ideas in conversation caching and intent matching. Contributions, ideas, and feedback are welcome!
+    See `examples/basic_usage.rs` for a runnable demonstration of storing, matching and replaying simple conversations.
+
+    ## Implementation notes
+
+    - Matching is intentionally heuristic and lightweight: purpose overlap, topic overlap and context tags are weighted to form a single similarity score. Sentiment can optionally boost matches.
+    - The database is in-memory for simplicity. Adding persistence or a disk-backed store is a clear next step.
+    - The API favors deterministic, testable behaviour over opaque ML models.
+
+    ## Running tests and lint
+
+    ```bash
+    cargo test
+    cargo test -- --nocapture
+    ```
+
+    ## Next steps and roadmap
+
+    1. Add optional persistence (sled / sqlite / rocksdb)
+    2. Optional embedding-based similarity as a pluggable matcher
+    3. Tools for templating and safe data substitution when replaying conversations
+    4. Small HTTP/gRPC shim for easy integration
+
+    ## Contributing
+
+    Contributions are welcome. Please open issues for design discussions and PRs for small, well-scoped improvements.
+
+    ## License
+
+    This project is provided for experimentation and learning. See the repository license (if any) for details.

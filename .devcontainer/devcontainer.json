@@ -1,0 +1,18 @@
+{
+  "name": "Rust (intent-database)",
+  "image": "mcr.microsoft.com/devcontainers/rust:1",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "serayuzgur.crates"
+      ],
+      "settings": {
+        "rust-analyzer.cargo.loadOutDirsFromCheck": true,
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "postCreateCommand": "cargo build --all",
+  "remoteUser": "vscode"
+}

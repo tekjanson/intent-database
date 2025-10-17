@@ -17,11 +17,7 @@ pub struct Intent {
 
 impl Intent {
     pub fn new(purpose: String) -> Self {
-        Self {
-            purpose,
-            topics: Vec::new(),
-            context_tags: Vec::new(),
-        }
+        Self { purpose, topics: Vec::new(), context_tags: Vec::new() }
     }
 
     pub fn with_topics(mut self, topics: Vec<String>) -> Self {
@@ -57,11 +53,7 @@ pub struct ConversationEntry {
 
 impl ConversationEntry {
     pub fn new(role: String, content: String) -> Self {
-        Self {
-            role,
-            content,
-            timestamp: Utc::now(),
-        }
+        Self { role, content, timestamp: Utc::now() }
     }
 }
 
@@ -163,14 +155,8 @@ mod tests {
         let intent = Intent::new("Chat".to_string());
         let mut conv = Conversation::new("test-2".to_string(), intent, Sentiment::Positive);
 
-        conv.add_entry(ConversationEntry::new(
-            "user".to_string(),
-            "Hello".to_string(),
-        ));
-        conv.add_entry(ConversationEntry::new(
-            "assistant".to_string(),
-            "Hi there!".to_string(),
-        ));
+        conv.add_entry(ConversationEntry::new("user".to_string(), "Hello".to_string()));
+        conv.add_entry(ConversationEntry::new("assistant".to_string(), "Hi there!".to_string()));
 
         assert_eq!(conv.entries.len(), 2);
         assert_eq!(conv.entries[0].role, "user");

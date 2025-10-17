@@ -1,0 +1,447 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>Intent DB — Chat + Debug</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --accent: #0078d4;
+      --muted: #666;
+      --bg: #fafafa;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+      margin: 12px;
+      background: #fff;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 12px auto;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 12px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.1rem
+    }
+
+    .controls {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .panel {
+      border: 1px solid #e6e6e6;
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--bg);
+    }
+
+    #chatPanel {
+      height: 70vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #chat {
+      flex: 1;
+      overflow: auto;
+      padding: 8px;
+    }
+
+    /* spider web */
+    #web {
+      width: 100%;
+      height: 240px;
+      border: 1px dashed #e0e0e0;
+      border-radius: 6px;
+      background: #fff;
+      margin-top: 8px
+    }
+
+    .msg {
+      margin: 8px 0;
+      display: flex;
+      max-width: 100%;
+    }
+
+    .msg.user {
+      justify-content: flex-end
+    }
+
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 14px;
+      max-width: 72%;
+      word-wrap: break-word
+    }
+
+    .bubble.user {
+      background: var(--accent);
+      color: #fff
+    }
+
+    .bubble.bot {
+      background: #f1f1f1;
+      color: #111
+    }
+
+    .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px
+    }
+
+    .composer {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px
+    }
+
+    input[type=text],
+    input[type=password],
+    select {
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px
+    }
+
+    button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #bbb;
+      background: #fff;
+      cursor: pointer
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent
+    }
+
+    #debug {
+      height: 70vh;
+      overflow: auto;
+    }
+
+    pre {
+      background: #111;
+      color: #0f0;
+      padding: 8px;
+      border-radius: 6px;
+      max-height: 40vh;
+      overflow: auto
+    }
+
+    .small {
+      font-size: 0.85rem;
+      color: var(--muted)
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>Intent DB — Chat + Debug</h1>
+      <div class="controls">
+        <label class="small">Adapter:
+          <select id="adapter">
+            <option value="template">Template</option>
+            <option value="sim">Simulated</option>
+            <option value="gemini">Gemini</option>
+          </select>
+        </label>
+        <label class="small">Gemini key: <input id="key" type="password" placeholder="optional" /></label>
+        <button id="setKey">Set</button>
+        <button id="clear">Clear Chat</button>
+      </div>
+    </header>
+
+    <section id="chatPanel" class="panel">
+      <div id="chat" aria-live="polite"></div>
+      <div class="composer">
+        <input id="ctx" type="text" placeholder="Type message, press Enter or Send" style="flex:1" />
+        <button id="send" class="primary">Send</button>
+      </div>
+      <div id="web" title="Conversation graph (grows as you chat)"></div>
+      <div class="row" style="margin-top:8px; justify-content:space-between">
+        <div class="muted">Requests are sent to <code>/chat</code>. Responses show short-circuit info if matched.</div>
+        <div class="small">Logs file: <code>logs/web_server.log</code></div>
+      </div>
+    </section>
+
+    <aside class="panel" id="debug">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Debug & Controls</strong>
+        <div class="row">
+          <button id="fetchLogs">Fetch Logs</button>
+          <button id="refreshMatches">Refresh Last Match</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <div><strong>Last Request</strong></div>
+        <pre id="lastRequest">(none)</pre>
+      </div>
+
+      <div style="margin-top:10px">
+        <div><strong>Last Response</strong></div>
+        <pre id="lastResponse">(none)</pre>
+      </div>
+
+      <div style="margin-top:10px">
+        <div><strong>Matched Info</strong> <span class="muted">(if any)</span></div>
+        <pre id="matched">(none)</pre>
+      </div>
+
+      <div style="margin-top:10px">
+        <div><strong>Server Logs (tail)</strong></div>
+        <pre id="logs">(no logs yet)</pre>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const ctxEl = document.getElementById('ctx');
+    const adapterEl = document.getElementById('adapter');
+    const keyEl = document.getElementById('key');
+    const lastRequestEl = document.getElementById('lastRequest');
+    const lastResponseEl = document.getElementById('lastResponse');
+    const matchedEl = document.getElementById('matched');
+    const logsEl = document.getElementById('logs');
+
+    let lastPayload = null;
+    let lastResponse = null;
+
+    function addMessage(text, who = 'bot', meta = '') {
+      const m = document.createElement('div'); m.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
+      const b = document.createElement('div'); b.className = 'bubble ' + (who === 'user' ? 'user' : 'bot');
+      b.innerText = text;
+      m.appendChild(b);
+      if (meta) { const mm = document.createElement('div'); mm.className = 'meta'; mm.innerText = meta; m.appendChild(mm); }
+      chatEl.appendChild(m);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function setLastRequest(obj) { lastPayload = obj; lastRequestEl.textContent = JSON.stringify(obj, null, 2); }
+    function setLastResponse(obj) { lastResponse = obj; lastResponseEl.textContent = JSON.stringify(obj, null, 2); }
+    function setMatched(obj) { matchedEl.textContent = obj ? JSON.stringify(obj, null, 2) : '(none)'; }
+
+    async function setKey() {
+      const k = keyEl.value;
+      const res = await fetch('/set_gemini', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: k }) });
+      if (res.ok) { addMessage('Gemini key set', 'bot'); } else { addMessage('Failed to set key', 'bot'); }
+    }
+
+    async function sendChat() {
+      const ctx = ctxEl.value.trim();
+      if (!ctx) return;
+      addMessage(ctx, 'user');
+      ctxEl.value = '';
+      const adapter = adapterEl.value;
+      const payload = { context: ctx, adapter };
+      setLastRequest(payload);
+
+      try {
+        const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (e) { json = { raw: text }; }
+        setLastResponse(json);
+
+        if (res.ok && json) {
+          // friendly UI handling: show the immediate user-facing AI response
+          const userResp = json.user_response || json.response || (json.raw || '');
+          if (userResp) {
+            addMessage(userResp, 'bot', json.matched ? (`matched id=${json.matched.id} score=${json.matched.score}`) : (json.persisted ? 'persisted' : 'not persisted'));
+          }
+          setMatched(json.matched || null);
+          // fetch latest graph from server to build connection map
+          fetchGraph();
+        } else {
+          addMessage('Error: ' + res.status + ' - ' + (json && json.error ? json.error : text), 'bot');
+        }
+      } catch (e) { addMessage('Network error: ' + e, 'bot'); }
+    }
+
+    document.getElementById('send').addEventListener('click', sendChat);
+    ctxEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { sendChat(); } });
+    document.getElementById('clear').addEventListener('click', () => { chatEl.innerHTML = ''; lastRequestEl.textContent = '(none)'; lastResponseEl.textContent = '(none)'; matchedEl.textContent = '(none)'; logsEl.textContent = '(no logs yet)'; });
+    document.getElementById('setKey').addEventListener('click', setKey);
+
+    document.getElementById('fetchLogs').addEventListener('click', async () => {
+      try {
+        const r = await fetch('/logs');
+        if (r.ok) {
+          const txt = await r.text();
+          logsEl.textContent = txt || '(empty)';
+        } else {
+          logsEl.textContent = 'Failed to fetch logs: ' + r.status;
+        }
+      } catch (e) { logsEl.textContent = 'Network error: ' + e; }
+    });
+
+    document.getElementById('refreshMatches').addEventListener('click', async () => {
+      // Attempt to re-run the last request to see if a match now exists (non-destructive)
+      if (!lastPayload) { addMessage('No last request to refresh', 'bot'); return; }
+      const payload = lastPayload;
+      try {
+        const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const j = await res.json().catch(() => null);
+        if (j) { setLastResponse(j); setMatched(j.matched || null); addMessage('Refreshed — see debug panel', 'bot'); }
+      } catch (e) { addMessage('Network error: ' + e, 'bot'); }
+    });
+
+    // Small convenience: focus input on load
+    ctxEl.focus();
+
+    // --- Simple spider-web / graph visualization ---
+    // We'll use an SVG inside #web and add nodes/links as chats happen.
+    const webEl = document.getElementById('web');
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('viewBox', '0 0 600 240');
+    webEl.appendChild(svg);
+
+    let nodes = []; // {id, label, x,y}
+    let links = []; // {source,target}
+
+    function addNode(label) {
+      const id = 'n' + (nodes.length + 1);
+      // place roughly in a circle with jitter
+      const angle = (nodes.length / Math.max(1, 8)) * Math.PI * 2 + Math.random() * 0.8;
+      const r = 60 + Math.random() * 70;
+      const cx = 300 + Math.cos(angle) * r;
+      const cy = 120 + Math.sin(angle) * r * 0.6;
+      const node = { id, label, x: cx, y: cy };
+      nodes.push(node);
+      drawGraph();
+      return node;
+    }
+
+    function addLink(srcId, dstId) {
+      links.push({ source: srcId, target: dstId });
+      drawGraph();
+    }
+
+    function drawGraph() {
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      // draw links
+      for (const l of links) {
+        const s = nodes.find(n => n.id === l.source);
+        const t = nodes.find(n => n.id === l.target);
+        if (!s || !t) continue;
+        const line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', s.x);
+        line.setAttribute('y1', s.y);
+        line.setAttribute('x2', t.x);
+        line.setAttribute('y2', t.y);
+        line.setAttribute('stroke', '#bbb');
+        line.setAttribute('stroke-width', '1.5');
+        svg.appendChild(line);
+      }
+      // draw nodes
+      for (const n of nodes) {
+        const g = document.createElementNS(svgNS, 'g');
+        const c = document.createElementNS(svgNS, 'circle');
+        c.setAttribute('cx', n.x);
+        c.setAttribute('cy', n.y);
+        c.setAttribute('r', 10);
+        c.setAttribute('fill', '#0078d4');
+        c.setAttribute('opacity', '0.95');
+        g.appendChild(c);
+        const t = document.createElementNS(svgNS, 'text');
+        t.setAttribute('x', n.x + 14);
+        t.setAttribute('y', n.y + 4);
+        t.setAttribute('font-size', '11');
+        t.setAttribute('fill', '#222');
+        t.textContent = n.label.slice(0, 28);
+        g.appendChild(t);
+        svg.appendChild(g);
+      }
+    }
+
+    // When a chat occurs, create nodes and link them: user message -> response
+    // Now the graph is driven by server data. This helper renders nodes/edges
+    // returned by GET /graph where nodes: [{id, snippet}] and edges: [{source,target,score}]
+    function renderGraphFromServer(data) {
+      nodes = [];
+      links = [];
+      if (!data) { drawGraph(); return; }
+      // map server ids to our internal node ids
+      const idMap = {};
+      let i = 0;
+      for (const n of (data.nodes || [])) {
+        i += 1;
+        const nid = 's' + i;
+        idMap[n.id] = nid;
+        // use snippet or id as label
+        addNode(n.snippet ? (n.snippet.slice(0, 40) || n.id) : n.id);
+      }
+      for (const e of (data.edges || [])) {
+        const s = idMap[e.source];
+        const t = idMap[e.target];
+        if (s && t) links.push({ source: s, target: t, score: e.score });
+      }
+      drawGraph();
+    }
+
+    async function fetchGraph() {
+      try {
+        const r = await fetch('/graph');
+        if (r.ok) {
+          const j = await r.json().catch(() => null);
+          if (j) {
+            renderGraphFromServer(j);
+            return;
+          }
+        }
+      } catch (e) { console.error('fetchGraph failed', e); }
+      // fallback: no-op
+    }
+
+    // hook into UI flow: when lastResponse changes, fetch graph from server
+    const origSetLastResponse = setLastResponse;
+    window.setLastResponse = function (obj) {
+      origSetLastResponse(obj); try {
+        fetchGraph();
+      } catch (e) { console.error('graph update failed', e); }
+    };
+
+    // fetch the initial graph on load
+    fetchGraph();
+  </script>
+
+</body>
+
+</html>

@@ -4,8 +4,9 @@ use intent_database::{Conversation, ConversationEntry, Intent, IntentDatabase, S
 fn main() {
     println!("=== Basic Usage Example ===\n");
 
-    // Create a database with custom threshold
-    let mut db = IntentDatabase::with_threshold(0.65);
+    // Load or create a database (demonstrates persistence)
+    let db_path = "intent_db.json";
+    let mut db = IntentDatabase::load_or_new(db_path, 0.65).expect("Failed to load or create DB");
 
     // Example 1: Simple conversation storage
     println!("1. Storing a simple conversation");
@@ -14,10 +15,7 @@ fn main() {
         .with_context_tags(vec!["friendly".to_string()]);
 
     let mut conv = Conversation::new("greeting-001".to_string(), intent, Sentiment::Positive);
-    conv.add_entry(ConversationEntry::new(
-        "user".to_string(),
-        "Hello!".to_string(),
-    ));
+    conv.add_entry(ConversationEntry::new("user".to_string(), "Hello!".to_string()));
     conv.add_entry(ConversationEntry::new(
         "assistant".to_string(),
         "Hi there! How can I help you today?".to_string(),
@@ -34,8 +32,7 @@ fn main() {
     let temp_conv = Conversation::new("temp-001".to_string(), temp_intent, Sentiment::Neutral)
         .with_expiry(Utc::now() + Duration::hours(1));
 
-    db.store(temp_conv)
-        .expect("Failed to store temp conversation");
+    db.store(temp_conv).expect("Failed to store temp conversation");
     println!("   ✓ Stored temporary conversation (expires in 1 hour)\n");
 
     // Example 3: Query for similar conversations
@@ -56,11 +53,7 @@ fn main() {
     // Example 4: Get best match
     println!("4. Getting best match");
     if let Some((best_id, score)) = db.get_best_match(&query) {
-        println!(
-            "   Best match: {} with {:.2}% similarity",
-            best_id,
-            score.score * 100.0
-        );
+        println!("   Best match: {} with {:.2}% similarity", best_id, score.score * 100.0);
         if let Some(conv) = db.get(&best_id) {
             println!("   Intent: {}", conv.intent.purpose);
             println!("   Entries: {}", conv.entries.len());
@@ -87,6 +80,13 @@ fn main() {
     let ids = db.list_ids();
     for id in ids {
         println!("   - {}", id);
+    }
+
+    // Save DB to disk to demonstrate persistence
+    if let Err(e) = db.save_to_file(db_path) {
+        eprintln!("Warning: failed to save db to {}: {}", db_path, e);
+    } else {
+        println!("Saved database to {}\n", db_path);
     }
 
     println!("\n=== Example Complete ===");

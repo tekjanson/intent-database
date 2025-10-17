@@ -95,11 +95,7 @@ fn main() {
     // Get the best match
     if let Some((best_id, score)) = db.get_best_match(&query) {
         if let Some(best) = db.get(&best_id) {
-            println!(
-                "\n🎯 Best match: {} with {:.2}% similarity",
-                best.id,
-                score.score * 100.0
-            );
+            println!("\n🎯 Best match: {} with {:.2}% similarity", best.id, score.score * 100.0);
             println!("   Intent: {}", best.intent.purpose);
             println!("   Topics: {:?}", best.intent.topics);
             println!("   Entries: {} messages", best.entries.len());
@@ -109,18 +105,12 @@ fn main() {
     // Demo fact invalidation
     println!("\n\nDemonstrating fact invalidation...");
     let expired_intent = Intent::new("Old fact".to_string());
-    let expired_conv = Conversation::new(
-        "conv-expired".to_string(),
-        expired_intent,
-        Sentiment::Neutral,
-    )
-    .with_expiry(Utc::now() - Duration::hours(1));
+    let expired_conv =
+        Conversation::new("conv-expired".to_string(), expired_intent, Sentiment::Neutral)
+            .with_expiry(Utc::now() - Duration::hours(1));
 
     db.store(expired_conv).unwrap();
-    println!(
-        "Added expired conversation. Database now has {} conversations",
-        db.len()
-    );
+    println!("Added expired conversation. Database now has {} conversations", db.len());
 
     let cleaned = db.cleanup_expired();
     println!(

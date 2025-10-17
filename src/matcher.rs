@@ -1,18 +1,17 @@
 //! Conversation matching and similarity scoring
 
 use crate::conversation::{Conversation, Intent};
+use serde::{Deserialize, Serialize};
 
 /// Represents a similarity score between two conversations
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SimilarityScore {
     pub score: f64,
 }
 
 impl SimilarityScore {
     pub fn new(score: f64) -> Self {
-        Self {
-            score: score.clamp(0.0, 1.0),
-        }
+        Self { score: score.clamp(0.0, 1.0) }
     }
 
     pub fn is_match(&self, threshold: f64) -> bool {
@@ -21,6 +20,7 @@ impl SimilarityScore {
 }
 
 /// Match conversations based on intent, topics, and context
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversationMatcher {
     /// Minimum similarity threshold for considering a match
     pub match_threshold: f64,
@@ -34,9 +34,7 @@ impl ConversationMatcher {
 
 impl Default for ConversationMatcher {
     fn default() -> Self {
-        Self {
-            match_threshold: 0.6,
-        }
+        Self { match_threshold: 0.6 }
     }
 }
 
@@ -86,11 +84,7 @@ impl ConversationMatcher {
         let intent_similarity = self.calculate_intent_similarity(&conv1.intent, &conv2.intent);
 
         // Sentiment match bonus
-        let sentiment_bonus = if conv1.sentiment == conv2.sentiment {
-            0.1
-        } else {
-            0.0
-        };
+        let sentiment_bonus = if conv1.sentiment == conv2.sentiment { 0.1 } else { 0.0 };
 
         let total_score = (intent_similarity + sentiment_bonus).min(1.0);
         SimilarityScore::new(total_score)
@@ -113,11 +107,8 @@ impl ConversationMatcher {
             .collect();
 
         // Sort by score descending
-        matches.sort_by(|a, b| {
-            b.1.score
-                .partial_cmp(&a.1.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        matches
+            .sort_by(|a, b| b.1.score.partial_cmp(&a.1.score).unwrap_or(std::cmp::Ordering::Equal));
         matches
     }
 

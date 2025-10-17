@@ -1,0 +1,4 @@
+nohup: ignoring input
+thread 'main' panicked at src/bin/web_server.rs:59:38:
+start server: Os { code: 98, kind: AddrInUse, message: "Address already in use" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

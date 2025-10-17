@@ -1,1 +1,38 @@
-/target
+# Rust/Cargo build artifacts
+/target/
+
+# Local sled database files (ignore runtime DB blobs/snapshots and DB dir)
+# keep data/intent-db/conf if present (project config) but ignore runtime files
+/data/intent-db/db/
+/data/intent-db/blobs/
+/data/intent-db/snap.*
+
+# Logs and temp files
+/logs/
+/tmp/
+/.tmp/
+nohup.out
+
+# Secrets and local-only keys
+/secrets/
+.env
+
+# PID files and runtime artifacts
+*.pid
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Ignore compiled binaries and miscellaneous artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+/build/
+
+# Keep Cargo.toml/Cargo.lock and source files tracked
+src/web_routes.rs
+data
