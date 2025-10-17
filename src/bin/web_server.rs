@@ -5,9 +5,9 @@ use intent_database::storage::SledStorage;
 use intent_database::web_helpers::PendingReview;
 use intent_database::web_routes;
 use intent_database::web_routes::WebContext;
-use intent_database::TemplateModelAdapter;
 #[cfg(feature = "gemini-model-adapter")]
 use intent_database::GeminiModelAdapter;
+use intent_database::TemplateModelAdapter;
 use std::env;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
@@ -114,11 +114,8 @@ fn main() {
 
     // Build a shared web context passed to handlers that need many dependencies
     // decide default adapter: use gemini if registered, otherwise template
-    let default_adapter = if ai.get("gemini").is_some() {
-        "gemini".to_string()
-    } else {
-        "template".to_string()
-    };
+    let default_adapter =
+        if ai.get("gemini").is_some() { "gemini".to_string() } else { "template".to_string() };
 
     let web_ctx = Arc::new(WebContext {
         ai: ai.clone(),
