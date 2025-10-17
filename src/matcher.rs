@@ -73,7 +73,11 @@ impl ConversationMatcher {
     }
 
     /// Calculate similarity between two conversations
-    pub fn calculate_similarity(&self, conv1: &Conversation, conv2: &Conversation) -> SimilarityScore {
+    pub fn calculate_similarity(
+        &self,
+        conv1: &Conversation,
+        conv2: &Conversation,
+    ) -> SimilarityScore {
         // Don't match expired conversations
         if conv1.is_expired() || conv2.is_expired() {
             return SimilarityScore::new(0.0);
@@ -221,11 +225,11 @@ mod tests {
     fn test_conversation_similarity() {
         let matcher = ConversationMatcher::new(0.5);
 
-        let intent1 = Intent::new("Get weather".to_string())
-            .with_topics(vec!["weather".to_string()]);
+        let intent1 =
+            Intent::new("Get weather".to_string()).with_topics(vec!["weather".to_string()]);
 
-        let intent2 = Intent::new("Get weather".to_string())
-            .with_topics(vec!["weather".to_string()]);
+        let intent2 =
+            Intent::new("Get weather".to_string()).with_topics(vec!["weather".to_string()]);
 
         let conv1 = Conversation::new("c1".to_string(), intent1, Sentiment::Neutral);
         let conv2 = Conversation::new("c2".to_string(), intent2, Sentiment::Neutral);
@@ -244,11 +248,13 @@ mod tests {
 
         let match_intent = Intent::new("Get weather information".to_string())
             .with_topics(vec!["weather".to_string(), "forecast".to_string()]);
-        let matching_conv = Conversation::new("match".to_string(), match_intent, Sentiment::Neutral);
+        let matching_conv =
+            Conversation::new("match".to_string(), match_intent, Sentiment::Neutral);
 
-        let no_match_intent = Intent::new("Order pizza".to_string())
-            .with_topics(vec!["food".to_string()]);
-        let no_match_conv = Conversation::new("nomatch".to_string(), no_match_intent, Sentiment::Positive);
+        let no_match_intent =
+            Intent::new("Order pizza".to_string()).with_topics(vec!["food".to_string()]);
+        let no_match_conv =
+            Conversation::new("nomatch".to_string(), no_match_intent, Sentiment::Positive);
 
         let candidates = vec![matching_conv, no_match_conv];
         let matches = matcher.find_matches(&query, &candidates);

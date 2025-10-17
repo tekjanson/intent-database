@@ -15,11 +15,8 @@ fn main() {
         .with_topics(vec!["weather".to_string(), "temperature".to_string()])
         .with_context_tags(vec!["casual".to_string()]);
 
-    let mut weather_conv = Conversation::new(
-        "conv-001".to_string(),
-        weather_intent,
-        Sentiment::Neutral,
-    );
+    let mut weather_conv =
+        Conversation::new("conv-001".to_string(), weather_intent, Sentiment::Neutral);
     weather_conv.add_entry(ConversationEntry::new(
         "user".to_string(),
         "What's the weather like today?".to_string(),
@@ -37,11 +34,8 @@ fn main() {
         .with_topics(vec!["weather".to_string(), "forecast".to_string()])
         .with_context_tags(vec!["casual".to_string()]);
 
-    let mut weather_conv2 = Conversation::new(
-        "conv-002".to_string(),
-        weather_intent2,
-        Sentiment::Neutral,
-    );
+    let mut weather_conv2 =
+        Conversation::new("conv-002".to_string(), weather_intent2, Sentiment::Neutral);
     weather_conv2.add_entry(ConversationEntry::new(
         "user".to_string(),
         "Tell me about the weather".to_string(),
@@ -115,9 +109,12 @@ fn main() {
     // Demo fact invalidation
     println!("\n\nDemonstrating fact invalidation...");
     let expired_intent = Intent::new("Old fact".to_string());
-    let expired_conv =
-        Conversation::new("conv-expired".to_string(), expired_intent, Sentiment::Neutral)
-            .with_expiry(Utc::now() - Duration::hours(1));
+    let expired_conv = Conversation::new(
+        "conv-expired".to_string(),
+        expired_intent,
+        Sentiment::Neutral,
+    )
+    .with_expiry(Utc::now() - Duration::hours(1));
 
     db.store(expired_conv).unwrap();
     println!(
@@ -134,4 +131,3 @@ fn main() {
 
     println!("\n✨ Demo complete!");
 }
-

@@ -32,9 +32,13 @@ impl IntentDatabase {
     /// Store a conversation in the database
     pub fn store(&mut self, conversation: Conversation) -> Result<(), String> {
         if self.conversations.contains_key(&conversation.id) {
-            return Err(format!("Conversation with id {} already exists", conversation.id));
+            return Err(format!(
+                "Conversation with id {} already exists",
+                conversation.id
+            ));
         }
-        self.conversations.insert(conversation.id.clone(), conversation);
+        self.conversations
+            .insert(conversation.id.clone(), conversation);
         Ok(())
     }
 
@@ -51,9 +55,13 @@ impl IntentDatabase {
     /// Update an existing conversation
     pub fn update(&mut self, conversation: Conversation) -> Result<(), String> {
         if !self.conversations.contains_key(&conversation.id) {
-            return Err(format!("Conversation with id {} does not exist", conversation.id));
+            return Err(format!(
+                "Conversation with id {} does not exist",
+                conversation.id
+            ));
         }
-        self.conversations.insert(conversation.id.clone(), conversation);
+        self.conversations
+            .insert(conversation.id.clone(), conversation);
         Ok(())
     }
 
@@ -210,13 +218,12 @@ mod tests {
         let conv2 = Conversation::new("conv2".to_string(), intent2, Sentiment::Neutral);
         db.store(conv2).unwrap();
 
-        let intent3 = Intent::new("Order pizza".to_string())
-            .with_topics(vec!["food".to_string()]);
+        let intent3 = Intent::new("Order pizza".to_string()).with_topics(vec!["food".to_string()]);
         let conv3 = Conversation::new("conv3".to_string(), intent3, Sentiment::Positive);
         db.store(conv3).unwrap();
 
-        let query_intent = Intent::new("Get weather".to_string())
-            .with_topics(vec!["weather".to_string()]);
+        let query_intent =
+            Intent::new("Get weather".to_string()).with_topics(vec!["weather".to_string()]);
         let query = Conversation::new("query".to_string(), query_intent, Sentiment::Neutral);
 
         let matches = db.find_similar(&query);
@@ -228,13 +235,12 @@ mod tests {
     fn test_database_get_best_match() {
         let mut db = IntentDatabase::with_threshold(0.6);
 
-        let intent1 = Intent::new("Get weather".to_string())
-            .with_topics(vec!["weather".to_string()]);
+        let intent1 =
+            Intent::new("Get weather".to_string()).with_topics(vec!["weather".to_string()]);
         let conv1 = Conversation::new("conv1".to_string(), intent1, Sentiment::Neutral);
         db.store(conv1).unwrap();
 
-        let intent2 = Intent::new("Order food".to_string())
-            .with_topics(vec!["food".to_string()]);
+        let intent2 = Intent::new("Order food".to_string()).with_topics(vec!["food".to_string()]);
         let conv2 = Conversation::new("conv2".to_string(), intent2, Sentiment::Positive);
         db.store(conv2).unwrap();
 
@@ -263,7 +269,8 @@ mod tests {
         db.store(active_conv).unwrap();
 
         let intent3 = Intent::new("Test 3".to_string());
-        let no_expiry_conv = Conversation::new("no-expiry".to_string(), intent3, Sentiment::Neutral);
+        let no_expiry_conv =
+            Conversation::new("no-expiry".to_string(), intent3, Sentiment::Neutral);
         db.store(no_expiry_conv).unwrap();
 
         assert_eq!(db.len(), 3);
