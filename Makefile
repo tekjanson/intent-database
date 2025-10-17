@@ -19,7 +19,7 @@ ci: fmt lint test
 
 # convenience targets for running the demo web server
 build:
-	cargo build --bin web_server
+	cargo build --bin web_server --features gemini-model-adapter
 
 # choose binary path based on RELEASE flag
 BIN := $(if $(filter 1,$(RELEASE)),target/release/web_server,target/debug/web_server)

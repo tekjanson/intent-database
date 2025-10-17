@@ -440,6 +440,14 @@
 
     // fetch the initial graph on load
     fetchGraph();
+    // Set adapter selector to server default (injected by server).
+    try {
+      const serverDefault = "{{DEFAULT_ADAPTER}}";
+      if (serverDefault) {
+        const sel = document.getElementById('adapter');
+        if (sel) sel.value = serverDefault;
+      }
+    } catch (e) { /* ignore */ }
   </script>
 
 </body>

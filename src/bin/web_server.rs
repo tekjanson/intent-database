@@ -33,15 +33,40 @@ fn main() {
             if !key.is_empty() {
                 let mut g = gemini_key.lock().unwrap();
                 *g = Some(key.clone());
-                #[cfg(feature = "gemini-model-adapter")]
-                {
-                    let endpoint = env::var("GEMINI_ENDPOINT")
-                        .unwrap_or_else(|_| "http://localhost:8081/gemini".to_string());
-                    let boxed = GeminiModelAdapter(endpoint, Some(key));
-                    ai.register("gemini", boxed);
-                    println!("Registered Gemini adapter from secrets/gemini_key");
-                }
             }
+        }
+    }
+
+    // If the gemini-model-adapter feature is enabled, always register a
+    // Gemini adapter (using env or secrets for the API key). We intentionally
+    // register even if there's no API key so the frontend can select Gemini
+    // and the server will attempt to use it — failures will be returned to
+    // the client rather than silently falling back to another adapter.
+    #[cfg(feature = "gemini-model-adapter")]
+    {
+        let endpoint = env::var("GEMINI_ENDPOINT").unwrap_or_else(|_| {
+                        // Default to Google's Generative Language API endpoint for the
+                        // chosen Gemini model. Users must provide a valid key via
+                        // GEMINI_KEY or secrets/gemini_key to authenticate.
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent".to_string()
+                    });
+        // prefer env GEMINI_KEY over secrets file
+        let env_key = env::var("GEMINI_KEY").ok();
+        let key = env_key.or_else(|| gemini_key.lock().unwrap().clone());
+        let boxed = GeminiModelAdapter(endpoint, key.clone());
+        ai.register("gemini", boxed);
+        println!(
+            "Registered Gemini adapter{}",
+            if key.is_some() { " (with key)" } else { " (no key)" }
+        );
+        if key.is_none() {
+            eprintln!("WARNING: No GEMINI_KEY provided. Gemini requests will likely fail with authentication errors. Set GEMINI_KEY env var or create secrets/gemini_key.");
+        }
+        // record the (possibly empty) key back into the shared mutex so
+        // other handlers that read it (e.g., /set_gemini) reflect current state
+        if key.is_some() {
+            let mut g = gemini_key.lock().unwrap();
+            *g = key;
         }
     }
 
@@ -134,7 +159,10 @@ fn main() {
 
         match (url.as_str(), request.method()) {
             ("/", _) => {
-                let html = include_str!("../../static/ui.html");
+                let raw = include_str!("../../static/ui.html");
+                // Replace placeholder {{DEFAULT_ADAPTER}} so the client UI can
+                // reflect the server-selected default adapter.
+                let html = raw.replace("{{DEFAULT_ADAPTER}}", &default_adapter);
                 let resp = Response::from_string(html).with_header(
                     Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
                 );

@@ -28,22 +28,24 @@ pub fn handle_chat(mut request: tiny_http::Request, context: Arc<WebContext>) {
         crate::conversation::Sentiment::Neutral,
     );
 
-    let user_response = context.rt.block_on(async {
-        match context.ai.generate_with(&adapter, ctx).await {
-            Ok(s) => s,
-            Err(_) => {
-                // fall back to template adapter if available
-                if adapter != "template" {
-                    match context.ai.generate_with("template", ctx).await {
-                        Ok(s2) => s2,
-                        Err(_) => "error".to_string(),
-                    }
-                } else {
-                    "error".to_string()
-                }
-            }
+    // Generate the immediate user-facing response using the chosen adapter.
+    // If the adapter fails we do NOT fall back to any other adapter — return
+    // an error to the client so failures are loud and explicit.
+    let user_response = match context.rt.block_on(context.ai.generate_with(&adapter, ctx)) {
+        Ok(s) => s,
+        Err(e) => {
+            // Log and return an error response to the client including adapter name.
+            let err_json = json!({"error": "adapter_error", "adapter": adapter, "message": e});
+            let _ = request.respond(
+                Response::from_string(err_json.to_string())
+                    .with_header(
+                        Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
+                    )
+                    .with_status_code(502),
+            );
+            return;
         }
-    });
+    };
 
     let connector: Option<Arc<dyn crate::connector::ChatConnector>> = match adapter.as_str() {
         "sim" => Some(Arc::new(SimulatedConnector::new(
@@ -71,16 +73,19 @@ pub fn handle_chat(mut request: tiny_http::Request, context: Arc<WebContext>) {
                     let adapter = adapter_str.clone();
                     async move {
                         let ctx = q_owned.intent.purpose.clone();
-                        let text = ai
-                            .generate_with(&adapter, &ctx)
-                            .await
-                            .unwrap_or_else(|_| "error".to_string());
-                        let mut conv = q_owned.clone();
-                        conv.add_entry(crate::conversation::ConversationEntry::new(
-                            "assistant".to_string(),
-                            text.clone(),
-                        ));
-                        Ok(conv)
+                        // If generation fails here, propagate the error instead of
+                        // returning a placeholder. This prevents silent fallbacks.
+                        match ai.generate_with(&adapter, &ctx).await {
+                            Ok(text) => {
+                                let mut conv = q_owned.clone();
+                                conv.add_entry(crate::conversation::ConversationEntry::new(
+                                    "assistant".to_string(),
+                                    text.clone(),
+                                ));
+                                Ok(conv)
+                            }
+                            Err(e) => Err(e),
+                        }
                     }
                 },
                 connector_clone,
